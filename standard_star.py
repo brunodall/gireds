@@ -56,11 +56,13 @@ stdstar = 'feige34'
 caldir = 'onedstds$ctionewcal/'
 
 star_idx = [i for i in idx if ((headers[i]['obstype'] == 'OBJECT')\
-    &(headers[i]['obsclass'] == 'partnerCal'))]
+    &(headers[i]['obsclass'] == 'partnerCal')
+    &(headers[i]['object'] != 'Twilight'))]
 
 star = [l[i][:-5] for i in star_idx]
-detector, observatory = headers[star_idx[0]]['detector'],\
-    headers[star_idx[0]]['observat']
+
+detector = [headers[i]['detector'] for i in star_idx]
+observatory = [headers[i]['observat'] for i in star_idx]
 
 arc = [l[i][:-5] for i in idx if\
     ((headers[i]['obstype'] == 'ARC') &\
