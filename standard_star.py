@@ -51,8 +51,8 @@ jd = [pf.getheader(i, ext=1)['mjd-obs'] for i in l]
 # tolerance in hours
 ttol = 2
 
-starobj = 'Feige34'
-stdstar = 'feige34'
+#starobj = 'Feige34'
+#stdstar = 'feige34'
 caldir = 'onedstds$ctionewcal/'
 
 star_idx = [i for i in idx if ((headers[i]['obstype'] == 'OBJECT')\
@@ -84,6 +84,14 @@ twilight_arc = [l[i][:-5] for i in idx if\
 
 bias = [l[i] for i in idx if headers[i]['obstype'] == 'BIAS']
 
+# get starobj/stdstar
+starobj = [headers[i]['object'] for i in star_idx] # (B) - add
+iraf.set(stddir=caldir)
+iraf.cd('stddir')
+stdlist = glob.glob('*')
+starnum = [''.join([i for i in j if i.isdigit()]) for j in starobj]
+stdstar = [[j for j in stdlist if j[-len(k)-4:] == k+'.dat'][0]  for k in starnum]
+iraf.cd('rawdir')
 
 
 
