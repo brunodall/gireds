@@ -62,41 +62,50 @@ idx = np.arange(len(l))
 headers = [pf.getheader(i, ext=0) for i in l]
 jd = [pf.getheader(i, ext=1)['mjd-obs'] for i in l]
 
-# tolerance in hours
+
+#   Define lists
+# flat tolerance in hours
 ttol = 2
+# boas toletance in dias
+ttol_bias = 100
 
-#starobj = 'Feige34'
-#stdstar = 'feige34'
-caldir = 'onedstds$ctionewcal/'
-
+# Estrela nao esta como uma lista de listas
 star_idx = [i for i in idx if ((headers[i]['obstype'] == 'OBJECT')\
     &(headers[i]['obsclass'] == 'partnerCal')
     &(headers[i]['object'] != 'Twilight'))]
 
 star = [l[i][:-5] for i in star_idx]
 
+arc = [[l[i][:-5] for i in idx if\
+       ((headers[i]['obstype'] == 'ARC') &\
+        (headers[i]['date-obs'] == headers[j]['date-obs'])&\
+        (headers[i]['observat'] == headers[j]['observat'])&\
+        (headers[i]['centwave'] == headers[j]['centwave']))]
+       for j in star_idx]
+
+flat = [[l[i][:-5] for i in idx if\
+        ((headers[i]['obstype'] == 'FLAT') &\
+         (abs(jd[i] - jd[j]) <= ttol*1./24.)&\
+         (headers[i]['observat'] == headers[j]['observat'])&\
+         (headers[i]['centwave'] == headers[j]['centwave']))]
+        for j in star_idx]
+
+twilight = [[l[i][:-5] for i in idx if\
+            ((headers[i]['obstype'] == 'OBJECT') & \
+             (headers[i]['object'] == 'Twilight')&\
+             (headers[i]['observat'] == headers[j]['observat'])&\
+             (headers[i]['centwave'] == headers[j]['centwave']))]
+            for j in star_idx]
+ 
+bias = [[l[i][:-5] for i in idx if\
+        ((headers[i]['obstype'] == 'BIAS')&\
+         (abs(jd[i] - jd[j]) <= ttol_bias)&\
+         (headers[i]['observat'] == headers[j]['observat']))]
+        for j in star_idx]
+
 detector = [headers[i]['detector'] for i in star_idx]
 observatory = [headers[i]['observat'] for i in star_idx]
 
-arc = [l[i][:-5] for i in idx if\
-    ((headers[i]['obstype'] == 'ARC') &\
-    (headers[i]['date-obs'] == headers[star_idx[0]]['date-obs']))]
-
-flat = [l[i][:-5] for i in idx if\
-    ((headers[i]['obstype'] == 'FLAT') &\
-    (abs(jd[i] - jd[star_idx[0]]) <= ttol*1./24.))]
-
-twilight_idx = [i for i in idx if\
-    ((headers[i]['obstype'] == 'OBJECT') & \
-    (headers[i]['object'] == 'Twilight'))]
-
-twilight = [l[i][:-5] for i in twilight_idx]
-twilight_arc = [l[i][:-5] for i in idx if\
-    ((headers[i]['obstype'] == 'ARC') & \
-    (headers[i]['date-obs'] == headers[twilight_idx[0]]['date-obs']) & \
-    (abs(jd[i] - jd[twilight_idx[0]]) <= ttol*1./24.))]
-
-bias = [l[i] for i in idx if headers[i]['obstype'] == 'BIAS']
 
 # get starobj/stdstar
 starobj = [headers[i]['object'] for i in star_idx] # (B) - add
@@ -106,7 +115,6 @@ stdlist = glob.glob('*')
 starnum = [''.join([i for i in j if i.isdigit()]) for j in starobj]
 stdstar = [[j for j in stdlist if j[-len(k)-4:] == k+'.dat'][0]  for k in starnum]
 iraf.cd('rawdir')
-
 
 
 iraf.gmos.logfile='feige34.log'
