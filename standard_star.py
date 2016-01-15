@@ -19,6 +19,20 @@ import glob
 import time
 from aplacos import applylacos
 
+# Read starinfo.dat and define structured array
+infofile = 'ctionewcal_flux/starinfo.dat'
+nstar = sum(1 for line in open(infofile))
+infoname = ['obj', 'stdcal', 'caldir', 'flux', 'esoflux']
+infofmt = ['|S25','|S25', '|S25', '|S25', '|S25']
+ninfo = len(infoname)
+starinfo = zeros(nstar,  dtype={'names':infoname, 'formats':infofmt})
+
+with open(infofile, 'r') as arq:
+    for i in range(nstar):
+        linelist = arq.readline().split()
+        for j in range(ninfo):
+            starinfo[i][j] = linelist[j]
+
 iraf.set(stdimage='imtgmos')
 
 iraf.gemini()
