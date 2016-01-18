@@ -349,11 +349,37 @@ for m, i in enumerate(star):
     plt.ylim(ymax=max(starrep[1])*1.3)
     plt.savefig('calib_'+starobj[m]+'.eps')
 
+#
+#   Apply flux calibration to star
+#
+for m, i in enumerate(star):
+    iraf.imdelete('cstexlrg'+i)
+
+    iraf.gscalibrate('stexlrg'+i, sfuncti='sens'+str(m), 
+         extinct='onedstds$ctioextinct.dat',
+         observatory=observatory[m], fluxsca=1, fl_vardq='yes')
+
+##
+##   Create data cubes
+##
+
+for m, i in enumerate(star):
+    iraf.imdelete('dcstexlrg'+i)
+    iraf.imdelete('cube_dcstexlrg'+i)
+    iraf.imdelete('cube_dcstexlrg'+i+'_SCI')
+
+    iraf.gfcube('cstexlrg'+i, outimage='cube_dcstexlrg'+i, ssample=.1, 
+         fl_atmdisp='yes')
+
+    iraf.imcopy('cube_dcstexlrg'+i+'.fits[sci,1]', 
+         'cube_dcstexlrg'+i+'_SCI.fits')   
+
+
 
 #
 #   Apply flux calibration to galaxy
 #
-#
+
 ##iraf.imdelete('cstexlrg@objr4.list')
 #
 ##iraf.gscalibrate('stexlrg@objr4.list',sfunction='sens.fits',fl_ext='yes',extinct='onedstds$ctioextinct.dat',observatory='Gemini-South',fluxsca=1)
