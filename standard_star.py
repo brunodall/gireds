@@ -17,7 +17,8 @@ import numpy as np
 import pyfits as pf
 import glob
 import time
-from aplacos import applylacos
+#from aplacos import applylacos
+import matplotlib.pyplot as plt
 
 # Read starinfo.dat and define structured array
 infofile = 'ctionewcal_flux/starinfo.dat'
@@ -33,25 +34,28 @@ with open(infofile, 'r') as arq:
         for j in range(ninfo):
             starinfo[i][j] = linelist[j]
 
+#set directories
+iraf.set(caldir='/datassd/gmos/GS-2013A-Q-61/')  # cal files, mainly the biases
+iraf.set(rawdir='/datassd/gmos/GS-2013A-Q-61/')  # raw files
+iraf.set(procdir='/datassd/gmos/star2013a/')  # processed files
+locrep = loc+'Dropbox/ic/reducao/15-01-16/ctionewcal_flux/' # star flux files
+
+iraf.cd('rawdir')
+
 iraf.set(stdimage='imtgmos')
 
 iraf.gemini()
 iraf.gemtools()
 iraf.gmos()
 
-#iraf.unlearn('gemini')
-#iraf.unlearn('gmos')
+iraf.unlearn('gemini')
+iraf.unlearn('gmos')
 
+iraf.gmos.logfile='ltt7379.log'
 iraf.task(lacos_spec='/storage/work/gemini_pairs/lacos_spec.cl')
 
 tstart = time.time()
 
-#set directories
-iraf.set(caldir='/datassd/gmos/GS-2013A-Q-61/')  # cal files, mainly the biases
-iraf.set(rawdir='/datassd/gmos/GS-2013A-Q-61/')  # raw files
-iraf.set(procdir='/datassd/gmos/star2013a/')  # processed files
-
-iraf.cd('rawdir')
 
 #iraf.setjd('*fits[0]')
 
@@ -107,17 +111,15 @@ detector = [headers[i]['detector'] for i in star_idx]
 observatory = [headers[i]['observat'] for i in star_idx]
 
 
-# get starobj/stdstar
-starobj = [headers[i]['object'] for i in star_idx] # (B) - add
-iraf.set(stddir=caldir)
-iraf.cd('stddir')
-stdlist = glob.glob('*')
-starnum = [''.join([i for i in j if i.isdigit()]) for j in starobj]
-stdstar = [[j for j in stdlist if j[-len(k)-4:] == k+'.dat'][0]  for k in starnum]
-iraf.cd('rawdir')
+# Get star info
+starinfo_idx = [ [i for i, m in enumerate(starinfo['obj']) \
+                 if m==headers[j]['object']][0] for j in star_idx]
 
+starobj = [starinfo[i]['obj'] for i in starinfo_idx]
+stdstar = [starinfo[i]['stdcal'] for i in starinfo_idx]
+caldir = [starinfo[i]['caldir'] for i in starinfo_idx]
+starflux = [[starinfo[i]['flux'] for i in starinfo_idx]]
 
-iraf.gmos.logfile='feige34.log'
 
 iraf.cd('procdir')
 
@@ -129,14 +131,16 @@ iraf.cd('procdir')
 def range_string(l):
     return (len(l)*'{:4s},').format(*[i[-4:] for i in l])
 
-iraf.gemlist(range=range_string(flat), root=flat[0][:-4], Stdout='flat.list')
-iraf.gemlist(range=range_string(arc), root=arc[0][:-4], Stdout='arc.list')
-iraf.gemlist(range=range_string(star), root=star[0][:-4], Stdout='star.list')
-iraf.gemlist(range=range_string(twilight),
-    root=twilight[0][:-4], Stdout='twilight.list')
+for j in range(len(star)):
+    iraf.gemlist(range=range_string(flat[j]), root=flat[j][0][:-4], 
+        Stdout='flat'+str(j)+'.list')
+    iraf.gemlist(range=range_string(arc[j]), root=arc[j][0][:-4],
+        Stdout='arc'+str(j)+'.list')
+    iraf.gemlist(range=range_string([star[j]]), root=[star[j]][0][:-4], 
+        Stdout='star'+str(j)+'.list')
+    iraf.gemlist(range=range_string(twilight[j]),
+        root=twilight[j][0][:-4], Stdout='twilight'+str(j)+'.list')
 
-
-iraf.gfreduce.bias = 'caldir$'+bias[0]
 
 #######################################################################
 #######################################################################
@@ -148,115 +152,203 @@ iraf.gfreduce.bias = 'caldir$'+bias[0]
 #   Flat reduction
 #
 
-for i in ['g', 'rg', 'erg']:
-    iraf.imdelete(i+'@flat.list')
 
-iraf.gfreduce('@flat.list', slits='header', rawpath='rawdir$', fl_inter='no',
-    fl_addmdf='yes', key_mdf='MDF', mdffile='default', weights='no',
-    fl_over='yes', fl_trim='yes', fl_bias='yes', trace='yes', t_order=4,
-    fl_flux='no', fl_gscrrej='no', fl_extract='yes', fl_gsappwave='no',
-    fl_wavtran='no', fl_novl='no', fl_skysub='no', reference='',
-    recenter='yes', fl_vardq='yes')
+for m in range(len(star)):
+    for i in ['g', 'rg', 'erg']:
+        iraf.imdelete(i+'@flat'+str(m)+'.list')
 
-for i in ['g', 'rg', 'erg']:
-    iraf.imdelete(i+'@twilight.list')
+    # (B) - 'fl_over=no';
+    iraf.gfreduce('@flat'+str(m)+'.list', slits='header', 
+        rawpath='rawdir$', fl_inter='no',
+        fl_addmdf='yes', key_mdf='MDF', mdffile='default', weights='no',
+        fl_over='no', fl_trim='yes', fl_bias='yes', trace='yes', t_order=4,
+        fl_flux='no', fl_gscrrej='no', fl_extract='yes', fl_gsappwave='no',
+        fl_wavtran='no', fl_novl='no', fl_skysub='no', reference='',
+        recenter='yes', fl_vardq='yes', bias='caldir$'+bias[m][0])
 
-iraf.gfreduce('@twilight.list', slits='header', rawpath='rawdir$',
-    fl_inter='no', fl_addmdf='yes', key_mdf='MDF',
-    mdffile='default', weights='no',
-    fl_over='yes', fl_trim='yes', fl_bias='yes', trace='yes', recenter='no',
-    fl_flux='no', fl_gscrrej='no', fl_extract='yes', fl_gsappwave='no',
-    fl_wavtran='no', fl_novl='no', fl_skysub='no',
-    reference='erg'+flat[0], fl_vardq='yes')
+
+#
+#   Twilight reduction
+#
+for m in range(len(star)):
+    for i in ['g', 'rg', 'erg']:
+        iraf.imdelete(i+'@twilight'+str(m)+'.list')
+
+    # (B) - 'fl_over=no';
+    iraf.gfreduce('@twilight'+str(m)+'.list', slits='header', rawpath='rawdir$',
+        fl_inter='no', fl_addmdf='yes', key_mdf='MDF',
+        mdffile='default', weights='no',
+        fl_over='no', fl_trim='yes', fl_bias='yes', trace='yes', recenter='no',
+        fl_flux='no', fl_gscrrej='no', fl_extract='yes', fl_gsappwave='no',
+        fl_wavtran='no', fl_novl='no', fl_skysub='no',
+        reference='erg'+flat[m][0], fl_vardq='yes', bias='caldir$'+bias[m][0])
+
 #
 #   Response function
 #
+for m in range(len(star)):
+    for i, j in enumerate(flat[m]):
+        iraf.imdelete('erg'+j+'_response')
 
+        iraf.gfresponse('erg'+j+'.fits', out='erg'+j+'_response',
+            skyimage='erg'+twilight[m][i], order=95, fl_inter='no', func='spline3',
+            sample='*', verbose='yes')
 
-for i, j in enumerate(flat):
-
-    iraf.imdelete(j+'_response')
-    iraf.gfresponse('erg'+j+'.fits', out='erg'+j+'_response',
-        skyimage='erg'+twilight[i], order=95, fl_inter='no', func='spline3',
-        sample='*', verbose='yes')
-
+#
 #   Arc reduction
 #
+for m in range(len(star)):
+    for i in arc[m]:
+        iraf.imdelete('*'+i+'.fits')
 
-for i in arc:
-    iraf.imdelete('*'+i+'.fits')
+    # (B) - 'fl_over=yes'; 'fl_bias=no'; #bias+,over- -> ERR
+    # (B) - Eh preciso subtrair o bias para criar VAR/DQ
+    # (B) - Da para usar bias-,over+  -> OK
+    # (B) - Usarei 'fl_over=yes'; 'fl_bias=no', fl_vardq- -> OK
+    iraf.gfreduce('@arc'+str(m)+'.list', slits='header', rawpath='rawdir$', fl_inter='no',
+        fl_addmdf='yes', key_mdf='MDF', mdffile='default', weights='no',
+        fl_over='yes', fl_trim='yes', fl_bias='no', trace='no', recenter='no',
+        fl_flux='no', fl_gscrrej='no', fl_extract='yes', fl_gsappwave='no',
+        fl_wavtran='no', fl_novl='no', fl_skysub='no', reference='erg'+flat[m][0],
+        fl_vardq='no', bias='caldir$'+bias[m][0])
 
-iraf.gfreduce('@arc.list', slits='header', rawpath='rawdir$', fl_inter='no',
-    fl_addmdf='yes', key_mdf='MDF', mdffile='default', weights='no',
-    fl_over='yes', fl_trim='yes', fl_bias='yes', trace='no', recenter='no',
-    fl_flux='no', fl_gscrrej='no', fl_extract='yes', fl_gsappwave='no',
-    fl_wavtran='no', fl_novl='no', fl_skysub='no', reference='erg'+flat[0],
-    fl_vardq='yes')
-
-
+#
 #   Finding wavelength solution
 #   Note: the automatic identification is very good
 #
 
-for i in arc:
-    iraf.gswavelength('erg'+i, function='chebyshev', nsum=15, order=4,
-        fl_inter='no', nlost=5, ntarget=20, aiddebug='s', threshold=5,
-        section='middle line')
+for m in range(len(star)):
+    for i in arc[m]:
+        iraf.gswavelength('erg'+i, function='chebyshev', nsum=15, order=4,
+            fl_inter='no', nlost=5, ntarget=20, aiddebug='s', threshold=5,
+            section='middle line')
 
 #
 #   Apply wavelength solution to the lamp 2D spectra
 #
 
-    iraf.imdelete('terg'+i+'.fits')
-    iraf.gftransform('erg'+i, wavtran='erg'+i, outpref='t', fl_vardq='yes')
+for m in range(len(star)):
+    for i in arc[m]:
+        # (B) Fiz fl_vardq-, pois mudei acima tambem --------
+        iraf.imdelete('terg'+i+'.fits')
+        iraf.gftransform('erg'+i, wavtran='erg'+i, outpref='t', fl_vardq='no')
 
 ##
 ##   Actually reduce star
 ##
 
-iraf.delete('std')
-iraf.delete('sens.fits')
+#-------------------------------------------------------------------------------------
+for m, i in enumerate(star):
+    iraf.imdelete('*g'+i+'.fits')
 
-for i in star:
-    iraf.delete('*g'+i+'.fits')
-    
+    # (B) - 'fl_over=no';
     iraf.gfreduce(
         i, slits='header', rawpath='rawdir$', fl_inter='no',
         fl_addmdf='yes', key_mdf='MDF', mdffile='default', weights='no',
-        fl_over='yes', fl_trim='yes', fl_bias='yes', trace='no', recenter='no',
+        fl_over='no', fl_trim='yes', fl_bias='yes', trace='no', recenter='no',
         fl_flux='no', fl_gscrrej='no', fl_extract='no', fl_gsappwave='no',
-        fl_wavtran='no', fl_novl='yes', fl_skysub='no', fl_vardq='yes')
+        fl_wavtran='no', fl_novl='yes', fl_skysub='no', fl_vardq='yes',
+        bias='caldir$'+bias[m][0])
 
-    #    applylacos('rg{:s}.fits'.format(i), clobber=True)
     iraf.gemcrspec('rg{:s}.fits'.format(i), out='lrg'+i, sigfrac=0.32, 
          niter=4, fl_vardq='yes')
-         
+
+for m, i in enumerate(star):
+    iraf.imdelete('*xlrg'+i+'.fits')
+
     iraf.gfreduce(
         'lrg'+i+'.fits', slits='header', rawpath='./', fl_inter='no',
         fl_addmdf='no', key_mdf='MDF', mdffile='default',
         fl_over='no', fl_trim='no', fl_bias='no', trace='no', recenter='no',
         fl_flux='no', fl_gscrrej='yes', fl_extract='yes', fl_gsappwave='yes',
         fl_wavtran='yes', fl_novl='no', fl_skysub='yes',
-        reference='erg'+flat[0], weights='no',
-        wavtraname='erg'+arc[0], response='erg'+flat[0]+'_response.fits',
+        reference='erg'+flat[m][0], weights='no',
+        wavtraname='erg'+arc[m][0], response='erg'+flat[m][0]+'_response.fits',
         fl_vardq='yes')
-#
-#   Apsumming the stellar spectra
-#
+
+# (( TEMP ))
+#for m, i in enumerate(star):
+#    # (B) Fiz fl_vardq-, pois mudei acima tambem --------
+#    iraf.imdelete('texlrg'+i+'.fits')
+#    iraf.gftransform('exlrg'+i, wavtran='erg'+arc[m][0], outpref='t', fl_vardq='yes')
+
+    #
+    #   Apsumming the stellar spectra
+    #
+for m, i in enumerate(star):
     iraf.imdelete('astexlrg'+i)
     iraf.gfapsum(
         'stexlrg'+i, fl_inter='no', lthreshold=400.,
         reject='avsigclip')
+#-------------------------------------------------------------------------------------
+
 #
 #   Building sensibility function
 #
 
-iraf.delete('std')
-iraf.delete('sens.fits')
+for m in range(len(star)):
+    iraf.delete('std'+str(m))
+    iraf.delete('sens'+str(m)+'.fits')
 
-iraf.gsstandard(
-    (len(star)*'astexlrg{:s}.fits,').format(*star), starname=stdstar,
-    observatory='Gemini-South', sfile='std', sfunction='sens', caldir=caldir)
+
+for m in range(len(star)):
+    iraf.gsstandard(
+        'astexlrg'+star[m], starname=stdstar[m],
+        observatory=observatory[m], sfile='std'+str(m),
+        sfunction='sens'+str(m), caldir=caldir[m])
+
+
+'''
+# Create list of list of star (to be used in gsstandard)
+# Nao funcionou
+
+tmpstar = [star_idx, star]
+star_idx0 = [[tmpstar[0][i] for i in range(len(star)) if ((star[i]==j))] 
+            for j in list(set(star))]
+star0 = [[tmpstar[1][i] for i in range(len(star)) if ((star[i]==j))] 
+            for j in list(set(star))]
+
+for m in range(len(star)):
+    iraf.delete('std'+str(m)+'_'+str(i))
+    iraf.delete('sens'+str(m)+'.fits')
+
+for m in range(len(star0)):
+    for i, n in enumerate(star0[m]):
+        iraf.gsstandard(
+            'astexlrg'+n, starname=stdstar[m],
+            observatory=observatory[m], sfile='std'+str(m)+'_'+str(i),
+            sfunction='sens'+str(m), caldir=caldir[m])
+'''
+
+
+# (B)Test calibration
+import matplotlib.pyplot as plt
+
+starflux = [locrep+starinfo[i]['flux'] for i in starinfo_idx]
+for m, i in enumerate(star):
+    iraf.delete('castexlrg'+i+'.fits')
+
+    iraf.gscalibrate(
+        'astexlrg'+i, sfuncti='sens'+str(m),
+        observa=observatory[m], fluxsca=1)
+
+    starcal_fl = pf.getdata('castexlrg'+i+'.fits', ext=2)
+    starcal_he = pf.getheader('castexlrg'+i+'.fits', ext=2)
+    starcal_wl = starcal_he['crval1'] + np.arange(starcal_he['naxis1'])*starcal_he['cdelt1']
+    starrep = np.loadtxt(starflux[m], unpack=True)
+
+    # Need: baixar arquivos de todas estrelas com contagem em fluxo
+    #       ou converter o arquivo do gmos de mag>fluxo
+    # Need: limitar range(x) do arquivo do repositorio
+    # Need: limitar range(y) do plot. 
+    plt.close('all')
+    plt.plot(starcal_wl, starcal_fl, 'b')
+    plt.plot(starrep[0], starrep[1], 'r', lw=1.56)
+    plt.xlim(starcal_wl[0], starcal_wl[-1])
+    plt.ylim(ymax=max(starrep[1])*1.3)
+    plt.savefig('calib_'+starobj[m]+'.eps')
+
+
 #
 #   Apply flux calibration to galaxy
 #
