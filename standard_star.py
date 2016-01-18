@@ -21,12 +21,12 @@ import time
 import matplotlib.pyplot as plt
 
 # Read starinfo.dat and define structured array
-infofile = 'ctionewcal_flux/starinfo.dat'
+infofile = '/home/eslamba/Dropbox/ic/reducao/starinfo.dat'
 nstar = sum(1 for line in open(infofile))
 infoname = ['obj', 'stdcal', 'caldir', 'flux', 'esoflux']
 infofmt = ['|S25','|S25', '|S25', '|S25', '|S25']
 ninfo = len(infoname)
-starinfo = zeros(nstar,  dtype={'names':infoname, 'formats':infofmt})
+starinfo = np.zeros(nstar,  dtype={'names':infoname, 'formats':infofmt})
 
 with open(infofile, 'r') as arq:
     for i in range(nstar):
@@ -34,11 +34,12 @@ with open(infofile, 'r') as arq:
         for j in range(ninfo):
             starinfo[i][j] = linelist[j]
 
+
 #set directories
-iraf.set(caldir='/datassd/gmos/GS-2013A-Q-61/')  # cal files, mainly the biases
-iraf.set(rawdir='/datassd/gmos/GS-2013A-Q-61/')  # raw files
-iraf.set(procdir='/datassd/gmos/star2013a/')  # processed files
-locrep = loc+'Dropbox/ic/reducao/15-01-16/ctionewcal_flux/' # star flux files
+iraf.set(caldir='/home/eslamba/ic/reducao/GN-2014B-Q-87_GS-2013A-Q-56/')  # cal files, mainly the biases
+iraf.set(rawdir='/home/eslamba/ic/reducao/GN-2014B-Q-87_GS-2013A-Q-56/')  # raw files
+iraf.set(procdir='/home/eslamba/ic/reducao/NGC5728/procSTAR_15-01-16/')  # processed files
+locrep = '/home/eslamba/Dropbox/ic/reducao/15-01-16/ctionewcal_flux/' # star flux files
 
 iraf.cd('rawdir')
 
@@ -52,7 +53,7 @@ iraf.unlearn('gemini')
 iraf.unlearn('gmos')
 
 iraf.gmos.logfile='ltt7379.log'
-iraf.task(lacos_spec='/storage/work/gemini_pairs/lacos_spec.cl')
+iraf.task(lacos_spec='/home/eslamba/LAcosmic/lacos_spec.cl')
 
 tstart = time.time()
 
